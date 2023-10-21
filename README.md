@@ -15,7 +15,7 @@ Performance of the proposed approximation used by the authors (not in the paper)
 
 Performance of the true MPL loss described in the paper without the supervised or UDA loss terms:
 
-![Approximate MPL](approximate_MPL_no_Sup.PNG)
+![Approximate MPL](true_MPL_no_Sup.PNG)
 
 
 Performance of the proposed approximation used by the authors (not in the paper) with the supervised term but no UDA loss term:
