@@ -2,10 +2,15 @@ import numpy as np
 import torch
 
 
-def MPL(U, L, Y, student, teacher, student_optimizer, teacher_optimizer, loss=torch.nn.CrossEntropyLoss(), sup_teacher=False):
+def MPL(U, L, Y, student, teacher, student_optimizer, teacher_optimizer, loss=torch.nn.CrossEntropyLoss(), sup_teacher=False, approx=False):
     SPL = teacher(U) # compute the soft pseudo labels
-    PL = torch.tensor([np.random.choice(np.arange(SPL.shape[-1]), None, False, torch.nn.Softmax(-1)(SPL).detach().cpu().numpy()[xi]) for xi in range(SPL.shape[0])]) # sample from the SPL distribution
+    PL = torch.tensor([np.random.choice(np.arange(SPL.shape[-1]), None, False, torch.nn.Softmax(-1)(SPL).detach().cpu().numpy()[xi]) for xi in range(SPL.shape[0])]).to(0) # sample from the SPL distribution
     # compute the gradient of the student parameters with respect to the pseudo labels
+    if approx:
+        student_initial_output = student(L)
+        student_loss_initial_l = loss(student_initial_output, Y).detach().clone()
+    student_optimizer.zero_grad()
+    
     student_initial_output = student(U)
     student_loss_initial = loss(student_initial_output, PL)
     
@@ -20,22 +25,27 @@ def MPL(U, L, Y, student, teacher, student_optimizer, teacher_optimizer, loss=to
     # compute the gradient of the student parameters with respect to the real labels
     student_final_output = student(L)
     student_loss_final = loss(student_final_output, Y)
+    student_loss_final_l = student_loss_final.detach().clone()
     student_loss_final.backward()
     grads2 = [param.grad.data.detach().clone() for param in student.parameters()]
 
     student_optimizer.zero_grad()
-    # compute h
-    h = sum([(grad1 * grad2).sum() for grad1, grad2 in zip(grads1, grads2)])
-    # https://github.com/google-research/google-research/issues/536
-    # h is approximable by: student_loss_final - loss(student_initial(L), Y) where student_initial is before the gradient update for U
-    # this is the first order taylor approximation of the above loss, and apparently has finite deviation from the true quantity.
-    # for correctness, I include instead the theoretically correct computation of h.
-    
+
     # compute the teacher MPL loss
-    teacher_loss_mpl = h * loss(SPL, PL)
-    teacher_out = teacher(L)
-    # optionally compute the teacher's supervised loss
-    if sup_teacher:
+    if approx:
+        # https://github.com/google-research/google-research/issues/536
+        # h is approximable by: student_loss_final - loss(student_initial(L), Y) where student_initial is before the gradient update for U
+        h_approx = student_loss_initial_l - student_loss_final
+        # this is the first order taylor approximation of the above loss, and apparently has finite deviation from the true quantity.
+        # for correctness, I include instead the theoretically correct computation of h
+        teacher_loss_mpl = h_approx.detach() * loss(SPL, PL)
+    else:
+        # compute h
+        h = sum([(grad1 * grad2).sum() for grad1, grad2 in zip(grads1, grads2)])
+        teacher_loss_mpl = h * loss(SPL, PL)
+    
+    if sup_teacher:# optionally compute the teacher's supervised loss
+        teacher_out = teacher(L)
         teacher_loss_sup = loss(teacher_out, Y)
         teacher_loss = teacher_loss_mpl + teacher_loss_sup
     else:
