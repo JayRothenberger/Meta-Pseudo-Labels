@@ -26,6 +26,11 @@ def MPL(U, L, Y, student, teacher, student_optimizer, teacher_optimizer, loss=to
     student_optimizer.zero_grad()
     # compute h
     h = sum([(grad1 * grad2).sum() for grad1, grad2 in zip(grads1, grads2)])
+    # https://github.com/google-research/google-research/issues/536
+    # h is approximable by: student_loss_final - loss(student_initial(L), Y) where student_initial is before the gradient update for U
+    # this is the first order taylor approximation of the above loss, and apparently has finite deviation from the true quantity.
+    # for correctness, I include instead the theoretically correct computation of h.
+    
     # compute the teacher MPL loss
     teacher_loss_mpl = h * loss(SPL, PL)
     teacher_out = teacher(L)
