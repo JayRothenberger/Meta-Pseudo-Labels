@@ -35,7 +35,7 @@ def MPL(U, L, Y, student, teacher, student_optimizer, teacher_optimizer, loss=to
     if approx:
         # https://github.com/google-research/google-research/issues/536
         # h is approximable by: student_loss_final - loss(student_initial(L), Y) where student_initial is before the gradient update for U
-        h_approx = student_loss_initial_l - student_loss_final
+        h_approx = student_loss_initial_l - student_loss_final_l
         # this is the first order taylor approximation of the above loss, and apparently has finite deviation from the true quantity.
         # for correctness, I include instead the theoretically correct computation of h
         teacher_loss_mpl = h_approx.detach() * loss(SPL, PL)
